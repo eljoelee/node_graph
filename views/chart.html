@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+  <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="css/square.css">
+  <script type="text/javascript">
+    google.load("visualization", "1", {
+      packages: ["corechart"]
+    });
+
+    function drawVisualization(dataFromAjax, sw) {
+      var data = new google.visualization.DataTable(dataFromAjax);
+      if (sw == 0) {
+        new google.visualization.LineChart(document.getElementById('chart_div')).draw(
+          data, {
+            series: {
+              0: {
+                color: '8B0707'
+              }
+            },
+            fontSize: 11,
+            title: "Today's Hourly Temperature",
+            titleTextStyle: {
+              fontSize: 30
+            },
+            height: 600
+          });
+      } else {
+        new google.visualization.LineChart(document.getElementById('chart_div')).draw(
+          data, {
+            series: {
+              0: {
+                color: '8B0707'
+              }
+            },
+            fontSize: 11,
+            title: "Daily Temperature",
+            titleTextStyle: {
+              fontSize: 30
+            },
+            height: 600
+          });
+      }
+    }
+
+    function todayReturn() {
+      var today = new Date();
+
+      var dd = today.getDate();
+      var mm = today.getMonth() + 1; //1월은 0으로 처리하므로 +1
+      var yyyy = today.getFullYear();
+
+      if (dd < 10) {
+        dd = '0' + dd
+      }
+
+      if (mm < 10) {
+        mm = '0' + mm
+      }
+
+      today = yyyy + '-' + mm + '-' + dd;
+
+      return today;
+    }
+
+    function showObj() {
+      var jsonTemp = $.ajax({
+        url: "http://localhost:8000/api/temps",
+        dataType: "json",
+        async: false
+      }).responseText;
+
+      var jsonDust = $.ajax({
+        url: "http://localhost:8000/api/dusts",
+        dataType: "json",
+        async: false
+      }).responseText;
+
+      var dustData = JSON.parse(jsonDust);
+
+      if (Number(dustData[0].dust) <= 30) {
+        console.log('blue');
+        $('.square-box').css('background', '#148CFF');
+        $('.square-content span').html(dustData[0].dust + '㎍/㎥<br />미세먼지<br />좋음')
+      } else if (Number(dustData[0].dust) > 31 || Number(dustData[0].dust) <= 80) {
+        console.log('green');
+        $('.square-box').css('background', '#369F36');
+        $('.square-content span').html(dustData[0].dust + '㎍/㎥<br />미세먼지<br />보통')
+      } else if (Number(dustData[0].dust) > 81 || Number(dustData[0].dust) <= 150) {
+        console.log('Yellow');
+        $('.square-box').css('background', '#FF8A19');
+        $('.square-content span').html(dustData[0].dust + '㎍/㎥<br />미세먼지<br />나쁨')
+      } else {
+        console.log('red');
+        $('.square-box').css('background', '#FF5675');
+        $('.square-content span').html(dustData[0].dust + '㎍/㎥<br />미세먼지<br />매우 나쁨')
+      };
+
+      var tempData = JSON.parse(jsonTemp);
+      var result = '{ "cols":[ {"type":"string"}, {"type":"number"}],"rows":[';
+
+      var today = todayReturn();
+
+      var sw = 0;
+      var tempSum = 0;
+      var count = 0;
+
+      for (var i = 0; i < tempData.length; i++) {
+        if (tempData.hasOwnProperty(i)) {
+          var date = tempData[i].date;
+          if ($("#selBox option:selected").val() == 'hourly') {
+            if (date.indexOf(today) != -1) {
+              result += '{"c":[{"v":"' + date.substr(5, date.length - 1) + '"}, {"v":' + tempData[i].temp + '}]},';
+            }
+          } else {
+            if (tempData[i + 1] != undefined && tempData[i + 1] != null) {
+              if (date.substr(5, 5) == tempData[i + 1].date.substr(5, 5)) {
+                tempSum += tempData[i].temp;
+                count++;
+              } else {
+                result += '{"c":[{"v":"' + date.substr(5, 5) + '"}, {"v":' + (tempSum / count).toFixed(2) + '}]},';
+                count = 0;
+                tempSum = 0;
+                sw = 1;
+              }
+            }
+          }
+        }
+      }
+
+      result = result.substr(0, result.length - 1);
+      result += ']}';
+
+      drawVisualization(result, sw);
+    }
+
+    google.setOnLoadCallback(showObj);
+    setInterval(function() {
+      showObj()
+    }, 600000);
+  </script>
+  <title>Temperature</title>
+</head>
+
+<body>
+  <select name="selBox" id="selBox" onChange="showObj()">
+      <option value="hourly">Today temp</option>
+      <option value="daily">Daily temp</option>
+    </select>
+  <div id="chart_div"></div>
+  <div class="wrapper">
+    <div class='square-box'>
+      <div class='square-content'>
+        <div><span></span></div>
+      </div>
+    </div>
+    <div class="col-lg-2 col-centered">
+      <div id="test-circle"></div>
+    </div>
+  </div>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="js/jquery.circliful.min.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+  <link rel="stylesheet" type="text/css" href="css/jquery.circliful.css">
+  <script type="text/javascript">
+    function showGraph() {
+      var jsonDiscom = $.ajax({
+        url: "http://localhost:8000/api/discomforts",
+        dataType: "json",
+        async: false
+      }).responseText;
+
+      var discomData = JSON.parse(jsonDiscom);
+
+      //discomfort 값을 들고오기 위해 index 접근, int 값 비교를 위해 number타입으로 변환
+      if (Number(discomData[0].discomfort) < 68) {
+        console.log('blue');
+        $("#test-circle").remove(); // 이미 그려진 그래프 요소를 삭제한다.
+        $(".col-lg-2").append('<div id="test-circle"></div>'); // 그래프 요소 삽입
+        $("#test-circle").circliful({ //circliful 플러그인 호출
+          percentageTextSize: 17,
+          animationStep: 10,
+          text: '불쾌지수',
+          iconColor: '#148CFF',
+          icon: 'f118', //font-awesome code
+          iconSize: '25',
+          iconPosition: 'top',
+          foregroundBorderWidth: 5, //바깥쪽 원 굵기
+          backgroundBorderWidth: 1, // 안쪽 원 테두리 굵기
+          foregroundColor: '#148CFF',
+          percent: discomData[0].discomfort,
+        });
+      } else if (Number(discomData[0].discomfort) >= 68 || Number(discomData[0].discomfort) < 75) {
+        console.log('green');
+        $("#test-circle").remove();
+        $(".col-lg-2").append('<div id="test-circle"></div>');
+        $("#test-circle").circliful({
+          percentageTextSize: 17,
+          animationStep: 10,
+          text: '불쾌지수',
+          iconColor: '#369F36',
+          icon: 'f11a',
+          iconSize: '25',
+          iconPosition: 'top',
+          foregroundBorderWidth: 5,
+          backgroundBorderWidth: 1,
+          foregroundColor: '#369F36',
+          percent: discomData[0].discomfort,
+        });
+      } else if (Number(discomData[0].discomfort) >= 75 || Number(discomData[0].discomfort) < 80) {
+        console.log('Yellow');
+        $("#test-circle").remove();
+        $(".col-lg-2").append('<div id="test-circle"></div>');
+        $("#test-circle").circliful({
+          percentageTextSize: 17,
+          animationStep: 10,
+          text: '불쾌지수',
+          iconColor: '#FF8A19',
+          icon: 'f119',
+          iconSize: '25',
+          iconPosition: 'top',
+          foregroundBorderWidth: 5,
+          backgroundBorderWidth: 1,
+          foregroundColor: '#FF8A19',
+          percent: discomData[0].discomfort,
+        });
+      } else {
+        console.log('red');
+        $("#test-circle").remove();
+        $(".col-lg-2").append('<div id="test-circle"></div>');
+        $("#test-circle").circliful({
+          percentageTextSize: 17,
+          animationStep: 10,
+          text: '불쾌지수',
+          iconColor: '#FF5675',
+          icon: 'f119',
+          iconSize: '25',
+          iconPosition: 'top',
+          foregroundBorderWidth: 5,
+          backgroundBorderWidth: 1,
+          foregroundColor: '#FF5675',
+          percent: discomData[0].discomfort,
+        });
+      };
+    }
+    showGraph();
+    setInterval(function() {
+      showGraph()
+    }, 600000);
+  </script>
+</body>
+
+</html>
